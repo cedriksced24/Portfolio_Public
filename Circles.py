@@ -24,6 +24,7 @@ from PyQt5.QtGui import QPainter, QColor, QFont, QPen
 from PyQt5.QtCore import Qt, QPoint, QPointF, QLineF, QRect
 
 
+# Calculates the shortest distance from a point to a line segment.
 def line_distance_to_point(line: QLineF, point: QPoint) -> float:
     """Calculate the distance from a point to a line segment."""
     p = QPointF(point)
@@ -43,6 +44,7 @@ def line_distance_to_point(line: QLineF, point: QPoint) -> float:
     return math.hypot(p.x() - closest.x(), p.y() - closest.y())
 
 
+# Returns the user-entered text from the dialog.
 class TextDialog(QDialog):
     def __init__(self, headline, text="", parent=None):
         super().__init__(parent)
@@ -62,6 +64,7 @@ class TextDialog(QDialog):
         return self.text_edit.toPlainText()
 
 
+# Initializes a circle widget with position, text, and dragging state.
 class CircleWidget(QWidget):
     def __init__(self, headline, position, text="", parent=None):
         super().__init__(parent)
@@ -71,6 +74,7 @@ class CircleWidget(QWidget):
         self.setFixedSize(60, 60)
         self.dragging = False  # track dragging state
 
+    # Draws the circle with its label and highlight if selected.
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -81,12 +85,14 @@ class CircleWidget(QWidget):
         painter.setFont(QFont("Arial", 10))
         painter.drawText(5, 5, 50, 50, Qt.AlignCenter, self.headline)
 
+    # Opens a dialog to edit the circle's text on double-click.
     def mouseDoubleClickEvent(self, event):
         dialog = TextDialog(self.headline, self.text, self)
         if dialog.exec_() == QDialog.Accepted:
             self.text = dialog.getText()
             print(f"Text for '{self.headline}' saved: {self.text}")
 
+    # Starts dragging (right-click) or selection (left-click) of a circle.
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
             self.dragging = True
@@ -95,6 +101,7 @@ class CircleWidget(QWidget):
             if self.parent():
                 self.parent().selectCircle(self.headline)
 
+    # Moves the circle as it's being dragged.
     def mouseMoveEvent(self, event):
         if self.dragging:
             new_pos = self.mapToParent(event.pos() - self.drag_offset)
@@ -110,11 +117,11 @@ class CircleWidget(QWidget):
             self.move(new_pos)
             parent.update()
 
+    # Stops dragging and updates the circle's stored position.
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.RightButton:
             self.dragging = False
             if self.parent():
-                # Update stored circle data with current position.
                 for data in self.parent().circle_data:
                     if data["headline"] == self.headline:
                         data["x"] = self.x()
@@ -123,16 +130,16 @@ class CircleWidget(QWidget):
 
 
 class CircleWindow(QWidget):
+    # Initializes the main application window with layout and data.
     def __init__(self):
         super().__init__()
         self.circle_widgets = {}
-        self.circle_data = (
-            []
-        )  # List of dictionaries: {"headline": ..., "x": ..., "y": ..., "text": ...}
+        self.circle_data = []
         self.graph = nx.Graph()
         self.first_clicked_circle = None
         self.initUI()
 
+    # Builds the UI layout and connects button events.
     def initUI(self):
         self.setWindowTitle("Circles")
         self.setGeometry(300, 300, 800, 600)
@@ -193,6 +200,7 @@ class CircleWindow(QWidget):
 
         self.show()
 
+    # Adds a new circle with given headline and optional text.
     def addCircle(self, headline, text=""):
         if headline in self.circle_widgets:
             return
@@ -207,12 +215,14 @@ class CircleWindow(QWidget):
         self.circle_widgets[headline] = widget
         self.graph.add_node(headline)
 
+    # Reads the input field and adds a new circle.
     def addCircleFromInput(self):
         headline = self.add_headline_input.text()
         if headline:
             self.addCircle(headline)
             self.add_headline_input.clear()
 
+    # Draws edges and their relation labels between circles.
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -245,6 +255,7 @@ class CircleWindow(QWidget):
                     painter.setPen(QPen(QColor(0, 0, 0)))
                     painter.drawText(rect, Qt.AlignCenter, relation_name)
 
+    # Connects two selected circles and prompts for relation name.
     def connectCircles(self, circle1, circle2):
         if not self.graph.has_edge(circle1, circle2):
             relation_name, ok = QInputDialog.getText(
@@ -254,6 +265,7 @@ class CircleWindow(QWidget):
                 self.graph.add_edge(circle1, circle2, relation_name=relation_name)
                 self.update()
 
+    # Selects a circle or creates a connection if two are selected.
     def selectCircle(self, headline):
         if self.first_clicked_circle:
             self.first_clicked_circle.selected = False
@@ -275,6 +287,7 @@ class CircleWindow(QWidget):
                     self.first_clicked_circle = None
         self.update()
 
+    # Detects mouse clicks on circles or lines and allows renaming.
     def mousePressEvent(self, event):
         clicked_widget = None
         for widget in self.circle_widgets.values():
@@ -313,6 +326,7 @@ class CircleWindow(QWidget):
             self.update()
         super().mousePressEvent(event)
 
+    # Saves all circles and connections to a human-readable TXT file.
     def saveDataTxt(self):
         file_name, _ = QFileDialog.getSaveFileName(
             self, "Save Data (TXT)", "", "Text Files (*.txt);;All Files (*)"
@@ -334,6 +348,7 @@ class CircleWindow(QWidget):
                 f.write(text)
             print(f"Data saved to {file_name}")
 
+    # Saves all circles and connections to a structured JSON file.
     def saveDataJson(self):
         file_name, _ = QFileDialog.getSaveFileName(
             self, "Save Data (JSON)", "", "JSON Files (*.json);;All Files (*)"
@@ -352,6 +367,7 @@ class CircleWindow(QWidget):
                 json.dump(data_to_save, f, indent=4)
             print(f"Data saved to {file_name}")
 
+    # Loads circle and edge data from a JSON file.
     def loadData(self):
         file_name, _ = QFileDialog.getOpenFileName(
             self, "Load Data (JSON)", "", "JSON Files (*.json);;All Files (*)"
@@ -374,6 +390,7 @@ class CircleWindow(QWidget):
                 self.graph.add_edge(u, v, **edge_data)
             self.update()
 
+    # Loads data from a custom-formatted TXT file.
     def loadDataTxt(self):
         file_name, _ = QFileDialog.getOpenFileName(
             self, "Load Data (TXT)", "", "Text Files (*.txt);;All Files (*)"
@@ -445,6 +462,7 @@ class CircleWindow(QWidget):
                 self.graph.add_edge(u, v, **edge_data)
             self.update()
 
+    # Displays a help message box with usage instructions.
     def showHelp(self):
         help_text = (
             "Help - Features Explanation:\n\n"
