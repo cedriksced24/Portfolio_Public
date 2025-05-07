@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Writer</title>
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .top-bar {
+      display: flex;
+      padding: 10px;
+      background: #f4f4f4;
+      border-bottom: 1px solid #ccc;
+    }
+    .main-area {
+      flex: 1;
+      display: flex;
+    }
+    .editor-area {
+      display: flex;
+      flex-direction: column;
+      flex: 2;
+      padding: 20px;
+      background: #fff;
+    }
+    #editor {
+  flex: 1;
+  font-size: 18px;
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-bottom: 10px;
+  height: 100%;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+    .toolbar {
+      margin-bottom: 10px;
+    }
+    .toolbar button, .toolbar input[type="color"] {
+      margin-right: 10px;
+      font-size: 16px;
+      padding: 4px 8px;
+    }
+    .navigation-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+      background: #f4f4f4;
+      border-top: 1px solid #ccc;
+    }
+    .navigation-controls button {
+      font-size: 18px;
+      margin: 0 10px;
+      padding: 6px 12px;
+    }
+    .navigation-controls span {
+      font-size: 16px;
+    }
+    .sidebar {
+      width: 25%;
+      min-width: 200px;
+      background: #f9f9f9;
+      border-left: 1px solid #ccc;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar h3 {
+      margin-top: 0;
+    }
+    .sidebar button {
+      padding: 6px 10px;
+      margin-bottom: 10px;
+      font-size: 16px;
+      text-align: left;
+      width: 100%;
+    }
+    .sidebar-content {
+      flex: 1;
+      border: 1px solid #ccc;
+      padding: 10px;
+      background: white;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <form onsubmit="createBook(event)" style="margin-right: 10px;">
+      <input type="text" id="new-book-title" placeholder="New book title" style="padding: 5px;" required>
+      <button type="submit">Add Book</button>
+    </form>
+    <select id="book-select" onchange="loadPagesForBook()">
+      {% for book in books %}
+        <option value="{{ book.id }}">{{ book.title }}</option>
+      {% endfor %}
+    </select>
+    <button onclick="deleteCurrentBook()" style="margin-left:10px; background: red; color: white;">
+      🗑 Delete Book
+    </button>
+  </div>
+
+  <div class="main-area">
+    <div class="editor-area">
+      <div class="toolbar">
+        <button onclick="formatText('bold')"><b>B</b></button>
+        <button onclick="formatText('italic')"><i>I</i></button>
+        <button onclick="formatText('underline')"><u>U</u></button>
+        <input type="color" onchange="setColor(this.value)" title="Textfarbe">
+        <button onclick="manualSave()">🔖 Save</button>
+      </div>
+      <div id="editor"></div>
+      <div class="navigation-controls">
+        <button onclick="previousPage()">⬅️</button>
+        <span id="page-indicator">Page 1</span>
+        <button onclick="nextPage()">➡️</button>
+      </div>
+    </div>
+    <div class="sidebar">
+      <h3>📖 Menü</h3>
+      <button onclick="showTab('welt')">🌍 Welt</button>
+      <button onclick="showTab('charakter')">🥝 Charakter</button>
+      <div id="sidebar-content" class="sidebar-content">
+        <p>Wähle eine Kategorie.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+  <script>
+    const CHAR_LIMIT = 2000;
+    let autoPagingLock = false;
+    let pagesPagedSet = new Set();
+    let typingTimer = null;
+    const TYPING_DELAY = 2000;
+    let isSettingContent = false;
+    let activeTab = null;
+
+    let quill = new Quill('#editor', {
+      theme: 'snow',
+      modules: { toolbar: false },
+      formats: ['bold', 'italic', 'underline', 'color']
+    });
+
+    let currentBookId = null;
+    let pages = [];
+    let currentPageIndex = 0;
+
+    function formatText(style) { quill.format(style, true); }
+    function setColor(color) { quill.format('color', color); }
+    function manualSave() { autoSaveCurrentPage(); alert("Seite gespeichert"); }
+
+    function showTab(tab) {
+      activeTab = tab;
+      const content = document.getElementById('sidebar-content');
+      if (tab === 'welt') {
+        content.innerHTML = `
+          <h4>🌍 Welt</h4>
+          <form onsubmit="addEntry(event, 'welt')">
+            <input type="text" name="name" placeholder="Name" required style="width: 100%; margin-bottom: 5px;"><br>
+            <textarea name="details" placeholder="Länder" rows="3" style="width: 100%;"></textarea><br>
+            <button type="submit">Speichern</button>
+          </form>
+          <ul id="welt-list" style="margin-top: 10px;"></ul>`;
+      } else if (tab === 'charakter') {
+        content.innerHTML = `
+          <h4>🥝 Charakter</h4>
+          <form onsubmit="addEntry(event, 'charakter')">
+            <input type="text" name="name" placeholder="Name" required style="width: 100%; margin-bottom: 5px;"><br>
+            <textarea name="details" placeholder="Beschreibung" rows="3" style="width: 100%;"></textarea><br>
+            <button type="submit">Speichern</button>
+          </form>
+          <ul id="charakter-list" style="margin-top: 10px;"></ul>`;
+      }
+    }
+
+    function addEntry(event, type) {
+      event.preventDefault();
+      const form = event.target;
+      const name = form.name.value.trim();
+      const details = form.details.value.trim();
+      if (!name) return;
+      const li = document.createElement('li');
+      li.textContent = `${name}: ${details}`;
+      document.getElementById(`${type}-list`).appendChild(li);
+      form.reset();
+    }
+
+    function loadPagesForBook() {
+      currentBookId = document.getElementById('book-select').value;
+      pagesPagedSet = new Set();
+      fetch(`/all-pages/${currentBookId}/`)
+        .then(res => res.json())
+        .then(data => {
+          pages = Array.isArray(data) ? data : [];
+          if (pages.length === 0) createNewPage();
+          else { currentPageIndex = 0; loadPageByIndex(0); }
+        });
+    }
+
+    function loadPageByIndex(index) {
+      if (index >= 0 && index < pages.length) {
+        currentPageIndex = index;
+        autoPagingLock = false;
+        const html = pages[index].content || '';
+        const delta = quill.clipboard.convert(html);
+        isSettingContent = true;
+        quill.setContents(delta, 'silent');
+        isSettingContent = false;
+        updateIndicator();
+        if (activeTab) showTab(activeTab);
+      }
+    }
+
+    function updateIndicator() {
+      document.getElementById('page-indicator').textContent =
+        `Page ${currentPageIndex + 1} of ${pages.length}`;
+    }
+
+    function nextPage() {
+      if (currentPageIndex < pages.length - 1) loadPageByIndex(currentPageIndex + 1);
+    }
+
+    function previousPage() {
+      if (currentPageIndex > 0) loadPageByIndex(currentPageIndex - 1);
+    }
+
+    function autoSaveCurrentPage() {
+      const page = pages[currentPageIndex];
+      if (!page) return Promise.resolve();
+      const content = quill.root.innerHTML;
+      return fetch(`/update-page/${page.id}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: new URLSearchParams({ 'title': page.title, 'content': content })
+      }).then(() => { pages[currentPageIndex].content = content });
+    }
+
+    function createNewPage() {
+      if (!currentBookId) return;
+      return fetch(`/save/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: new URLSearchParams({ 'book_id': currentBookId, 'title': `Page ${pages.length + 1}`, 'content': '' })
+      })
+      .then(res => res.json())
+      .then(newPage => {
+        pages.push(newPage);
+        currentPageIndex = pages.length - 1;
+        quill.setContents([]);
+        updateIndicator();
+      });
+    }
+
+    quill.on('text-change', function () {
+      if (isSettingContent) return;
+      const length = quill.getLength();
+      const currentPage = pages[currentPageIndex];
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(() => autoSaveCurrentPage(), TYPING_DELAY);
+
+      if (length > CHAR_LIMIT && !autoPagingLock && currentPage && !pagesPagedSet.has(currentPage.id)) {
+        autoPagingLock = true;
+        pagesPagedSet.add(currentPage.id);
+        const fullDelta = quill.getContents();
+        const firstPart = fullDelta.slice(0, CHAR_LIMIT);
+        const remainingPart = fullDelta.slice(CHAR_LIMIT);
+        isSettingContent = true;
+        quill.setContents(firstPart);
+        isSettingContent = false;
+        autoSaveCurrentPage().then(() => {
+          return fetch(`/save/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: new URLSearchParams({ 'book_id': currentBookId, 'title': `Page ${pages.length + 1}`, 'content': '' })
+          });
+        }).then(res => res.json())
+        .then(newPage => {
+          pages.push(newPage);
+          currentPageIndex = pages.length - 1;
+          quill.setContents(remainingPart);
+          updateIndicator();
+          autoPagingLock = false;
+        });
+      }
+    });
+
+    function createBook(event) {
+      event.preventDefault();
+      const title = document.getElementById('new-book-title').value;
+      fetch('/create-book/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: new URLSearchParams({ title })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const select = document.getElementById('book-select');
+        const option = document.createElement('option');
+        option.value = data.id;
+        option.textContent = data.title;
+        select.appendChild(option);
+        select.value = data.id;
+        document.getElementById('new-book-title').value = '';
+        loadPagesForBook();
+      });
+    }
+
+    function deleteCurrentBook() {
+      const select = document.getElementById('book-select');
+      const bookId = select.value;
+      if (!bookId) return;
+      if (!confirm("Wirklich löschen?")) return;
+      fetch(`/delete-book/${bookId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'deleted') {
+          select.remove(select.selectedIndex);
+          if (select.options.length > 0) {
+            select.selectedIndex = 0;
+            loadPagesForBook();
+          } else {
+            currentBookId = null;
+            pages = [];
+            currentPageIndex = 0;
+            quill.setContents([]);
+            document.getElementById('page-indicator').textContent = 'No book selected';
+          }
+        }
+      });
+    }
+
+    window.onload = loadPagesForBook;
+  </script>
+</body>
+</html>
