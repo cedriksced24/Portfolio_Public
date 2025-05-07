@@ -36,7 +36,7 @@ function StockSuggestion() {
 
     try {
       const response = await fetch(
-        `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=YRCGLQL0P9C9E3H2`
+        `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey="URAPIKEY"`
       );
 
       if (!response.ok) {
