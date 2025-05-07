@@ -1,6 +1,6 @@
 Übersicht
 
-In diesem kleinen Repository befinden sich mehrere Projekte, die unterschiedliche Technologien und Anwendungsfälle abdecken. Hier eine kurze Beschreibung der drei Hauptprojekte:
+In diesem kleinen Repository befinden sich ein paar (fast) fertige Projekte.
 
 1. BookWriter (Django)
 
