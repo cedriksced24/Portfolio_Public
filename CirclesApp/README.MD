@@ -26,6 +26,7 @@ Bereits umgesetzte Funktionen
 
  Projekt ist versioniert und auf GitHub veröffentlicht
 
+
 To-Do / Verbesserungsmöglichkeiten
  Undo/Redo-Funktion (z. B. STRG+Z)
 
