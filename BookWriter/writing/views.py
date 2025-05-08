@@ -5,11 +5,13 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 
 
+# Display the post editor with a list of posts ordered by creation date
 def post_editor(request):
     posts = Post.objects.order_by("-created_at")
     return render(request, "writing/editor.html", {"posts": posts})
 
 
+# Save a new post to the database
 @csrf_exempt
 def save_post(request):
     if request.method == "POST":
@@ -19,12 +21,14 @@ def save_post(request):
         return JsonResponse({"id": post.id, "title": post.title})
 
 
+# Load a post by its ID
 @csrf_exempt
 def load_post(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
     return JsonResponse({"id": post.id, "title": post.title, "content": post.content})
 
 
+# Delete a post by its ID
 @csrf_exempt
 def delete_post(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
@@ -32,11 +36,13 @@ def delete_post(request, post_id):
     return JsonResponse({"status": "deleted"})
 
 
+# Display the editor with a list of all books
 def editor(request):
     books = Book.objects.all()
     return render(request, "writing/editor.html", {"books": books})
 
 
+# Save a new page to a specific book
 @csrf_exempt
 def save_page(request):
     if request.method == "POST":
@@ -56,6 +62,7 @@ def save_page(request):
         return JsonResponse({"id": page.id, "title": page.title})
 
 
+# Get all pages for a specific book, ordered by custom order and creation date
 @csrf_exempt
 def get_pages(request, book_id):
     pages = Page.objects.filter(book_id=book_id).order_by("order", "-created_at")
@@ -63,12 +70,14 @@ def get_pages(request, book_id):
     return JsonResponse(data, safe=False)
 
 
+# Load a page by its ID
 @csrf_exempt
 def load_page(request, page_id):
     page = get_object_or_404(Page, id=page_id)
     return JsonResponse({"id": page.id, "title": page.title, "content": page.content})
 
 
+# Delete a page by its ID
 @csrf_exempt
 def delete_page(request, page_id):
     page = get_object_or_404(Page, id=page_id)
@@ -76,6 +85,7 @@ def delete_page(request, page_id):
     return JsonResponse({"status": "deleted"})
 
 
+# Get all pages for a book, ordered by order and creation date
 def get_all_pages(request, book_id):
     pages = Page.objects.filter(book_id=book_id).order_by("order", "created_at")
     data = [
@@ -84,6 +94,7 @@ def get_all_pages(request, book_id):
     return JsonResponse(data, safe=False)
 
 
+# Create a new book
 @csrf_exempt
 def create_book(request):
     if request.method == "POST":
@@ -92,6 +103,7 @@ def create_book(request):
         return JsonResponse({"id": book.id, "title": book.title})
 
 
+# Delete a book by its ID
 @csrf_exempt
 def delete_book(request, book_id):
     if request.method == "POST":
@@ -100,17 +112,13 @@ def delete_book(request, book_id):
         return JsonResponse({"status": "deleted"})
 
 
+# Update the title and content of an existing page
 @csrf_exempt
 def update_page(request, page_id):
     if request.method == "POST":
         page = get_object_or_404(Page, id=page_id)
         new_title = request.POST.get("title", page.title)
         new_content = request.POST.get("content", page.content)
-
-        print("🔄 update_page CALLED")
-        print("🆔 page.id:", page.id)
-        print("📄 new title:", new_title)
-        print("✏️ new content (preview):", new_content[:100])
 
         page.title = new_title
         page.content = new_content
